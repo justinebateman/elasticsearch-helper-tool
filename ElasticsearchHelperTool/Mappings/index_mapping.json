@@ -1,0 +1,51 @@
+{
+  "aliases": {
+    "things": {}
+  },
+  "settings": {
+    "analysis": {
+      "normalizer": {
+        "case_insensitive": {
+          "filter": "lowercase"
+        }
+      },
+      "tokenizer": {
+        "autocomplete": {
+          "type": "edge_ngram",
+          "min_gram": 3,
+          "max_gram": 25,
+          "token_chars": [
+            "letter"
+          ]
+        }
+      },
+      "analyzer": {
+        "autocomplete": {
+          "tokenizer": "autocomplete",
+          "filter": [
+            "lowercase"
+          ]
+        },
+        "autocomplete_search": {
+          "tokenizer": "lowercase"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "Name": {
+        "type": "text",
+        "analyzer": "autocomplete",
+        "search_analyzer": "autocomplete_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "normalizer": "case_insensitive",
+            "ignore_above": 256
+          }
+        }
+      }
+    }
+  }
+}
