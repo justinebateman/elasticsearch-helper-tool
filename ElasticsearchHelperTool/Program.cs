@@ -52,7 +52,7 @@ namespace ElasticsearchHelperTool
                 var userInput = Console.ReadLine()?.Trim().ToLower();
                 performAction = userInput == "y";
             }
-            else if (isAppRunningInCi)
+            else
             {
                 // we're running in CI so we don't want to take user input, just automatically run the app
                 performAction = true;
@@ -82,7 +82,8 @@ namespace ElasticsearchHelperTool
                     Console.WriteLine("3 - Restore the latest snapshot");
 
                     var userInput = Console.ReadLine()?.Trim().ToLower();
-                    if (!String.IsNullOrEmpty(userInput) && Enum.TryParse(userInput, out ActionsToPerform action))
+                    // if user entered a number that exists as an option in ActionsToPerform enum, then set the action
+                    if (!String.IsNullOrEmpty(userInput) && Int32.TryParse(userInput, out int userInputAsInt) && Enum.IsDefined(typeof(ActionsToPerform), userInputAsInt) && Enum.TryParse(userInput, out ActionsToPerform action))
                     {
                         actionToPerform = action;
                     }
@@ -128,7 +129,7 @@ namespace ElasticsearchHelperTool
             IServiceProvider provider = serviceScope.ServiceProvider;
 
             IndexMappingService indexMappingService = provider.GetRequiredService<IndexMappingService>();
-            await indexMappingService.UpdateIndexMapping();
+            await indexMappingService.UpdateIndexMappingAsync();
         }
 
         private static async Task GetIndexMapping(IServiceProvider services, string indexName)
@@ -137,7 +138,7 @@ namespace ElasticsearchHelperTool
             IServiceProvider provider = serviceScope.ServiceProvider;
 
             ElasticsearchRestClient elasticsearchRestClient = provider.GetRequiredService<ElasticsearchRestClient>();
-            var mapping = await elasticsearchRestClient.GetIndexMapping(indexName);
+            var mapping = await elasticsearchRestClient.GetIndexMappingAsync(indexName);
             Console.WriteLine($"Response: {mapping.StatusCode} {mapping.Content}");
         }
     }

@@ -27,13 +27,13 @@ public class ElasticsearchRestClient
             .AddDefaultHeader("Authorization", $"ApiKey {elasticsearchSettings.ApiKey}");
     }
 
-    public Task<RestResponse> GetIndexMapping(string indexName)
+    public Task<RestResponse> GetIndexMappingAsync(string indexName)
     {
         var request = new RestRequest($"/{indexName}/_mapping", Method.Get);
         return this.client.ExecuteAsync(request);
     }
 
-    public Task<RestResponse> CreateSnapshot(string indexName, string snapshotName)
+    public Task<RestResponse> CreateSnapshotAsync(string indexName, string snapshotName)
     {
         var request = new RestRequest($"/_snapshot/{this.elasticsearchSettings.SnapshotRepositoryName}/{snapshotName}", Method.Put)
             .AddJsonBody(new CreateSnapshotRequest()
@@ -47,7 +47,7 @@ public class ElasticsearchRestClient
         return this.client.ExecuteAsync(request);
     }
 
-    public Task<RestResponse> RestoreSnapshot(string indexName, string snapshotName)
+    public Task<RestResponse> RestoreSnapshotAsync(string indexName, string snapshotName)
     {
         var request = new RestRequest($"/_snapshot/{this.elasticsearchSettings.SnapshotRepositoryName}/{snapshotName}/_restore", Method.Post)
             .AddJsonBody(new RestoreSnapshotRequest()
@@ -57,7 +57,7 @@ public class ElasticsearchRestClient
         return this.client.ExecuteAsync(request);
     }
 
-    public Task<RestResponse> CreateIndex(string indexName, string mapping)
+    public Task<RestResponse> CreateIndexAsync(string indexName, string mapping)
     {
         var request = new RestRequest($"/{indexName}", Method.Put)
             .AddJsonBody(mapping);
@@ -83,13 +83,13 @@ public class ElasticsearchRestClient
         return this.client.ExecuteAsync(request);
     }
 
-    public Task<RestResponse> GetIndexDocumentCount(string indexName)
+    public Task<RestResponse> GetIndexDocumentCountAsync(string indexName)
     {
         var request = new RestRequest($"/{indexName}/_count", Method.Get);
         return this.client.ExecuteAsync(request);
     }
 
-    public Task<RestResponse> DeleteIndex(string indexName)
+    public Task<RestResponse> DeleteIndexAsync(string indexName)
     {
         var request = new RestRequest($"/{indexName}", Method.Delete);
         return this.client.ExecuteAsync(request);

@@ -19,53 +19,66 @@ public class IndexMappingService
         this.elasticsearchSettings = elasticsearchSettings;
     }
 
-    public async Task UpdateIndexMapping()
+    public async Task UpdateIndexMappingAsync()
     {
         string indexV1Name = this.elasticsearchSettings.IndexV1Name;
         string indexV2Name = this.elasticsearchSettings.IndexV2Name;
 
-        string snapshotName = "";
-
         // create a snapshot before performing any action
         if (!this.elasticsearchSettings.UseLocal)
         {
-            snapshotName = $"helper-tool-{DateTime.Now.ToString("YYYYMMDDHHmmsss")}";
-            await this.elasticsearchRestClient.CreateSnapshot(indexV1Name, snapshotName);
+            await this.CreateSnapshotAsync(indexV1Name);
         }
 
         // get existing document count
-        var existingDocumentCount = await this.GetDocumentCountFromIndex(indexV1Name);
+        var existingDocumentCount = await this.GetDocumentCountFromIndexAsync(indexV1Name);
 
         // "../Mappings/index_mapping.json"
         var indexV1Mapping = JObject.Parse(File.ReadAllText($"{Directory.GetCurrentDirectory()}{Path.DirectorySeparatorChar}mappings{Path.DirectorySeparatorChar}index_mapping.json"));
         var indexV2Mapping = JObject.FromObject(indexV1Mapping);
-        indexV2Mapping = this.UpdateIndexV2MappingAliasName(indexV2Mapping);
+        indexV2Mapping = this.UpdateIndexV2MappingAliasNameAsync(indexV2Mapping);
 
-        await this.CreateIndex(indexV2Name, indexV2Mapping.ToString());
+        await this.CreateIndexAsync(indexV2Name, indexV2Mapping.ToString());
 
-        await this.Reindex(indexV1Name, indexV2Name, existingDocumentCount);
+        await this.ReindexAsync(indexV1Name, indexV2Name, existingDocumentCount);
 
-        await this.DeleteIndex(indexV1Name);
+        await this.DeleteIndexAsync(indexV1Name);
 
-        await this.CreateIndex(indexV1Name, indexV1Mapping.ToString());
+        await this.CreateIndexAsync(indexV1Name, indexV1Mapping.ToString());
 
-        await this.Reindex(indexV2Name, indexV1Name, existingDocumentCount);
+        await this.ReindexAsync(indexV2Name, indexV1Name, existingDocumentCount);
 
-        await this.DeleteIndex(indexV2Name);
+        await this.DeleteIndexAsync(indexV2Name);
 
         Console.WriteLine("Done!");
     }
 
-    private JObject UpdateIndexV2MappingAliasName(JObject indexV2Mapping)
+    private async Task<string> CreateSnapshotAsync(string indexName)
+    {
+        var snapshotName = $"helper-tool-{DateTime.Now.ToString("yyyyMMddHHmmsss")}";
+        var response = await this.elasticsearchRestClient.CreateSnapshotAsync(indexName, snapshotName);
+        if (response.IsSuccessful)
+        {
+            Console.WriteLine($"Snapshot {snapshotName} created");
+        }
+        else
+        {
+            throw new Exception($"Failed to create snapshot {snapshotName}. Response: {response.StatusCode} {response.Content}");
+        }
+
+        return snapshotName;
+    }
+
+    private JObject UpdateIndexV2MappingAliasNameAsync(JObject indexV2Mapping)
     {
         indexV2Mapping.SelectToken($"aliases.{elasticsearchSettings.IndexAlias}")?.Parent?.Remove();
         indexV2Mapping["aliases"]![$"{elasticsearchSettings.IndexAlias}2"] = new JObject();
         return indexV2Mapping;
     }
 
-    private async Task CreateIndex(string indexName, string mapping)
+    private async Task CreateIndexAsync(string indexName, string mapping)
     {
-        var response = await this.elasticsearchRestClient.CreateIndex(indexName, mapping);
+        var response = await this.elasticsearchRestClient.CreateIndexAsync(indexName, mapping);
 
         if (!response.IsSuccessful)
         {
@@ -75,16 +88,15 @@ public class IndexMappingService
         Console.WriteLine($"Index {indexName} created");
     }
 
-    private async Task<int> GetDocumentCountFromIndex(string indexName)
+    private async Task<int> GetDocumentCountFromIndexAsync(string indexName)
     {
         Console.WriteLine($"Getting document count from index {indexName}");
-        var response = await this.elasticsearchRestClient.GetIndexDocumentCount(indexName);
+        var response = await this.elasticsearchRestClient.GetIndexDocumentCountAsync(indexName);
         if (response.IsSuccessful && response.Content != null)
         {
             var countResponse = JsonConvert.DeserializeObject<CountResponse>(response.Content);
             if (countResponse != null)
             {
-                // TODO remove
                 Console.WriteLine($"Document count from index {indexName}: {countResponse.Count}");
                 return countResponse.Count;
             }
@@ -99,7 +111,7 @@ public class IndexMappingService
         }
     }
 
-    private async Task RetryGetDocumentCountUntilCountMatchesExpected(string indexName, int expectedDocumentCount)
+    private async Task RetryGetDocumentCountUntilCountMatchesExpectedAsync(string indexName, int expectedDocumentCount)
     {
         var policy = Policy
             .Handle<Exception>()
@@ -108,37 +120,37 @@ public class IndexMappingService
             {
                 Console.WriteLine("Retrying get document count...");
             });
-        var actualDocumentCount = await policy.ExecuteAsync(() => this.GetDocumentCountFromIndex(indexName));
+        var actualDocumentCount = await policy.ExecuteAsync(() => this.GetDocumentCountFromIndexAsync(indexName));
         if (actualDocumentCount != expectedDocumentCount)
         {
             throw new Exception($"Failed to get document count from index {indexName} after 3 retries. Expected: {expectedDocumentCount} Actual: {actualDocumentCount}");
         }
     }
 
-    private async Task Reindex(string sourceIndexName, string destinationIndexNameTwo, int expectedDocumentCount)
+    private async Task ReindexAsync(string sourceIndexName, string destinationIndexName, int expectedDocumentCount)
     {
-        Console.WriteLine($"Starting Reindex from {sourceIndexName} to {destinationIndexNameTwo}. Expected documents: {expectedDocumentCount}");
-        var response = await this.elasticsearchRestClient.ReIndex(sourceIndexName, destinationIndexNameTwo);
+        Console.WriteLine($"Starting Reindex from {sourceIndexName} to {destinationIndexName}. Expected documents: {expectedDocumentCount}");
+        var response = await this.elasticsearchRestClient.ReIndex(sourceIndexName, destinationIndexName);
 
         if (!response.IsSuccessful || response.Content == null)
         {
-            throw new Exception($"Failed to reindex from {sourceIndexName} to {destinationIndexNameTwo}. Response: {response.StatusCode} {response.Content ?? "No content"}");
+            throw new Exception($"Failed to reindex from {sourceIndexName} to {destinationIndexName}. Response: {response.StatusCode} {response.Content ?? "No content"}");
         }
 
         var reindexResponse = JsonConvert.DeserializeObject<ReindexResponse>(response.Content);
         if (reindexResponse?.Total == null || reindexResponse.Total != expectedDocumentCount)
         {
-            throw new Exception($"Failed to reindex from {sourceIndexName} to {destinationIndexNameTwo}. Expected document count: {expectedDocumentCount} Actual document count: {reindexResponse?.Total}");
+            throw new Exception($"Failed to reindex from {sourceIndexName} to {destinationIndexName}. Expected document count: {expectedDocumentCount} Actual document count: {reindexResponse?.Total}");
         }
 
-        await this.RetryGetDocumentCountUntilCountMatchesExpected(destinationIndexNameTwo, expectedDocumentCount);
+        await this.RetryGetDocumentCountUntilCountMatchesExpectedAsync(destinationIndexName, expectedDocumentCount);
 
-        Console.WriteLine($"Reindex from {sourceIndexName} to {destinationIndexNameTwo} completed. Total documents: {reindexResponse?.Total}");
+        Console.WriteLine($"Reindex from {sourceIndexName} to {destinationIndexName} completed. Total documents: {reindexResponse?.Total}");
     }
 
-    private async Task DeleteIndex(string indexName)
+    private async Task DeleteIndexAsync(string indexName)
     {
-        var response = await this.elasticsearchRestClient.DeleteIndex(indexName);
+        var response = await this.elasticsearchRestClient.DeleteIndexAsync(indexName);
         if (!response.IsSuccessful)
         {
             throw new Exception($"Failed to delete {indexName}. Response: {response.StatusCode} {response.Content}");
