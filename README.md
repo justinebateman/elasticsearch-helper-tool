@@ -69,7 +69,7 @@ This option will perform the following steps:
 - Recreate the index with the new mapping
 - Reindex from v2 onto the new index
 - Delete v2
-- Before the index is updated a snapshot will be taken with the name $"helper-tool-{DateTime.Now.ToString("YYYYMMDDHHmmsss")}";
+- Before the index is updated a snapshot will be taken with the name `$"helper-tool-{DateTime.UtcNow.ToString("yyyyMMddHHmmss")}"`
 
 This can be restored if anything goes wrong
 
