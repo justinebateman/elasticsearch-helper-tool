@@ -61,9 +61,15 @@ If you haven't supplied the action cmd line option you will be asked to enter an
 This option will just get the current index mapping and print it to console. This is a readonly action that is useful just to check that you're connected correctly 
 
 ## 2 - Update the mappings for the index
-This option will perform the same steps listed here - [https://stackoverflow.com/c/songtradr/questions/69](https://stackoverflow.com/c/songtradr/questions/69)
+This option will perform the following steps:
 
-Before the index is updated a snapshot will be taken with the name `$"helper-tool-{DateTime.UtcNow.ToString("yyyyMMddHHmmss")}"`
+- Create a v2 of your index
+- Reindex from the current version to v2 (to basically backup all Documents)
+- Delete the current index
+- Recreate the index with the new mapping
+- Reindex from v2 onto the new index
+- Delete v2
+- Before the index is updated a snapshot will be taken with the name $"helper-tool-{DateTime.Now.ToString("YYYYMMDDHHmmsss")}";
 
 This can be restored if anything goes wrong
 
